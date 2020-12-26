@@ -11,38 +11,39 @@ namespace PCAFFINITY
 
     public class RegistryCommands
     {
-        public RegistryCommands(RegistryView registryView, RegistryKey baseKey, string subKey, bool throwErrors = false)
+        public RegistryCommands(RegistryView registryView, RegistryKey baseKey, string subKey, bool throwErrors = false, string remotePC = null)
         {
             BaseRegistryView = registryView;
             BaseRegistryKey = baseKey;
-            SubKey = subKey;
+            SubKey = FixSubKey(subKey);
             ThrowErrors = throwErrors;
+            RemotePC = remotePC;
         }
 
-        public RegistryCommands(RegistryKey baseKey, string subKey, bool throwErrors = false)
+        public RegistryCommands(RegistryKey baseKey, string subKey, bool throwErrors = false, string remotePC = null)
         {
             BaseRegistryKey = baseKey;
-            SubKey = subKey;
+            SubKey = FixSubKey(subKey);
             ThrowErrors = throwErrors;
+            RemotePC = remotePC;
         }
 
         public RegistryCommands(string subKey, RegistryView registryView)
         {
             BaseRegistryView = registryView;
-            SubKey = subKey;
+            SubKey = FixSubKey(subKey);
         }
 
         public RegistryCommands(string subKey)
         {
-            SubKey = subKey;
+            SubKey = FixSubKey(subKey);
         }
 
+        public string SubKey { get; set; } = "SOFTWARE\\" + System.Reflection.Assembly.GetEntryAssembly().GetName().Version;
         private RegistryKey BaseRegistryKey { get; } = Registry.LocalMachine;
         private RegistryView BaseRegistryView { get; }
+        private string RemotePC { get; }
         private bool ThrowErrors { get; }
-        public string SubKey { get; set; } = "SOFTWARE\\" + System.Reflection.Assembly.GetEntryAssembly().GetName().Version;
-
-        //private string SubKey { get; } = "SOFTWARE\\" + Application.ProductName;
 
         public bool DeleteKey(string KeyName)
         {
@@ -72,7 +73,35 @@ namespace PCAFFINITY
             }
         }
 
-        public bool DeleteSubKeyTree()
+        public bool DeleteSubKeyTree(string KeyName, bool throwOnMissing = false)
+        {
+            try
+            {
+                using RegistryKey rk = OpenNewBaseKey();
+                using RegistryKey sk1 = rk.CreateSubKey(SubKey);
+                if (sk1 == null)
+                {
+                    return true;
+                }
+                else
+                {
+                    sk1.DeleteSubKeyTree(KeyName, throwOnMissing);
+                }
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (ThrowErrors)
+                {
+                    throw new InvalidOperationException($"Err Deleting: {SubKey}{Environment.NewLine}{e.Message}");
+                }
+
+                return false;
+            }
+        }
+
+        public bool DeleteSubKeyTree(bool throwOnMissing = false)
         {
             try
             {
@@ -80,7 +109,7 @@ namespace PCAFFINITY
                 using RegistryKey sk1 = rk.OpenSubKey(SubKey);
                 if (sk1 != null)
                 {
-                    rk.DeleteSubKeyTree(SubKey);
+                    rk.DeleteSubKeyTree(SubKey, throwOnMissing);
                 }
 
                 return true;
@@ -152,7 +181,6 @@ namespace PCAFFINITY
         {
             using RegistryKey rk = OpenNewBaseKey();
             using RegistryKey sk1 = rk.OpenSubKey($@"{SubKey}\{subKeyFolder}");
-
             if (sk1 == null)
             {
                 return null;
@@ -247,6 +275,21 @@ namespace PCAFFINITY
             }
         }
 
+        private string FixSubKey(string skey)
+        {
+            if (skey == null)
+            {
+                return string.Empty;
+            }
+
+            if (skey.StartsWith("\\"))
+            {
+                skey = skey.Substring(1, skey.Length - 1);
+            }
+
+            return skey.Trim();
+        }
+
         private RegistryKey OpenNewBaseKey()
         {
             RegistryHive key = BaseRegistryKey.ToString().ToUpper() switch
@@ -258,7 +301,14 @@ namespace PCAFFINITY
                 _ => RegistryHive.LocalMachine,
             };
 
-            return RegistryKey.OpenBaseKey(key, BaseRegistryView);
+            if (RemotePC != null)
+            {
+                return RegistryKey.OpenRemoteBaseKey(key, RemotePC, BaseRegistryView);
+            }
+            else
+            {
+                return RegistryKey.OpenBaseKey(key, BaseRegistryView);
+            }
         }
     }
 }
