@@ -5,7 +5,7 @@ Easily modify Windows Registry x86 or x64 keys.
 Contains many custom and useful functions.
 
 <b>Settings</b>
-
+<br>
 - Variables:
   - SubKey = Registry key of your choice. (string)
 
@@ -23,7 +23,7 @@ Contains many custom and useful functions.
   - subKey = Registry subkey location (string)
   - throwErrors = Throw on error (bool)
   - remotePC = Name of remote PC (string)
-
+___
     DeleteKey(string KeyName)
     DeleteSubKeyTree(string KeyName, bool throwOnMissing = false)
     DeleteSubKeyTree(bool throwOnMissing = false)
